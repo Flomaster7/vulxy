@@ -124,16 +124,23 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
      * compute-to-compute barrier makes generated counters and draw commands
      * available to subsequent prefix-sum/translucency compute stages.
      */
+    public void record(VkCommandBuffer commandBuffer) {
+        this.checkOpen();
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        this.context.graphicsToComputeBarrier(commandBuffer);
+        this.pipeline.dispatchIndirect(commandBuffer, this.indirectDispatchBuffer(), 0);
+        this.context.computeToComputeBarrier(commandBuffer);
+    }
+
     public void dispatch() {
         this.checkOpen();
         if (this.context.isInRenderPass()) {
             throw new IllegalStateException("MDIC command generation must run outside an active render pass");
         }
-
         VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
-        this.context.graphicsToComputeBarrier(commandBuffer);
-        this.pipeline.dispatchIndirect(commandBuffer, this.indirectDispatchBuffer(), 0);
-        this.context.computeToComputeBarrier(commandBuffer);
+        this.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
     }
 
