@@ -12,6 +12,7 @@ import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties2;
+import org.lwjgl.vulkan.VkFormatProperties;
 import org.lwjgl.vulkan.VkPhysicalDeviceSubgroupProperties;
 import org.lwjgl.vulkan.VK11;
 
@@ -135,6 +136,22 @@ public final class VoxyVulkanContext {
                         | VK11.VK_SUBGROUP_FEATURE_ARITHMETIC_BIT
                         | VK11.VK_SUBGROUP_FEATURE_CLUSTERED_BIT
         );
+    }
+
+    /**
+     * Checks the optimal-tiling format capabilities exposed by the selected
+     * physical device. Required for formats used as sampled/storage images.
+     */
+    public boolean supportsOptimalImageFormat(int format, int requiredFeatures) {
+        if (format <= 0 || requiredFeatures == 0) {
+            throw new IllegalArgumentException("Format and required feature flags must be valid");
+        }
+        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkFormatProperties properties = VkFormatProperties.calloc(stack);
+            vkGetPhysicalDeviceFormatProperties(physicalDevice, format, properties);
+            return (properties.optimalTilingFeatures() & requiredFeatures) == requiredFeatures;
+        }
     }
 
     public void requireComputeOnFrontendQueue() {
