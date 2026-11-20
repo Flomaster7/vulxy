@@ -101,16 +101,23 @@ public final class VoxyVulkanMDICTranslucentGenPass implements AutoCloseable {
      * Dispatches after the prefix sum. Writes are made visible to the following
      * translucent indirect-draw pass with a compute-to-graphics barrier.
      */
+    public void record(VkCommandBuffer commandBuffer) {
+        this.checkOpen();
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        this.context.computeToComputeBarrier(commandBuffer);
+        this.pipeline.dispatchIndirect(commandBuffer, this.dispatchBuffer, 0);
+        this.context.computeToGraphicsBarrier(commandBuffer);
+    }
+
     public void dispatch() {
         this.checkOpen();
         if (this.context.isInRenderPass()) {
             throw new IllegalStateException("MDIC translucent generation must run outside an active render pass");
         }
-
         VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
-        this.context.computeToComputeBarrier(commandBuffer);
-        this.pipeline.dispatchIndirect(commandBuffer, this.dispatchBuffer, 0);
-        this.context.computeToGraphicsBarrier(commandBuffer);
+        this.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
     }
 
