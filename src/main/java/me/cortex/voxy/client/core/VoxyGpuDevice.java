@@ -4,6 +4,8 @@ import com.mojang.renderpearl.api.device.GpuBackend;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
+import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
+import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
@@ -50,9 +52,19 @@ public final class VoxyGpuDevice {
         VulkanDevice vulkanDevice = backendImplementation instanceof VulkanDevice selectedVulkanDevice
                 ? selectedVulkanDevice
                 : null;
+        VulkanCommandEncoder vulkanCommandEncoder = null;
+        if (createdDevice instanceof FrontendGpuDevice) {
+            var frontendEncoder = createdDevice.createCommandEncoder();
+            if (frontendEncoder instanceof FrontendCommandEncoder wrappedEncoder
+                    && wrappedEncoder.backend() instanceof VulkanCommandEncoder selectedEncoder) {
+                vulkanCommandEncoder = selectedEncoder;
+            }
+        }
 
         backend = vulkanSelected ? Backend.VULKAN : Backend.OTHER;
-        vulkanContext = vulkanDevice == null ? null : new VoxyVulkanContext(vulkanDevice);
+        vulkanContext = vulkanDevice == null || vulkanCommandEncoder == null
+                ? null
+                : new VoxyVulkanContext(vulkanDevice, vulkanCommandEncoder);
         backendClassName = backendImplementation == null
                 ? selectedBackend.getClass().getName()
                 : backendImplementation.getClass().getName();
