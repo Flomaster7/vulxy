@@ -30,6 +30,7 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
 
     private final VoxyVulkanContext context;
     private final VoxyVulkanComputePipeline pipeline;
+    private final VoxyVulkanBuffer dispatchBuffer;
     private final boolean statisticsEnabled;
     private boolean closed;
 
@@ -54,6 +55,7 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         context.requireComputeOnFrontendQueue();
 
         this.context = context;
+        this.dispatchBuffer = drawCountBuffer;
         this.statisticsEnabled = statisticsBuffer != null;
 
         Map<String, String> defines = Map.of(
@@ -124,16 +126,9 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         this.context.endAndEnqueue(commandBuffer);
     }
 
-    /**
-     * Exposes the dispatch source registered in binding 2. The actual indirect
-     * buffer object is cached separately by the pipeline constructor's caller.
-     * This method is replaced by the explicit field assignment below in source.
-     */
     private VoxyVulkanBuffer indirectDispatchBuffer() {
         return this.dispatchBuffer;
     }
-
-    private final VoxyVulkanBuffer dispatchBuffer = null;
 
     @Override
     public void close() {
