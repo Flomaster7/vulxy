@@ -252,7 +252,7 @@ public final class VoxyVulkanImage implements AutoCloseable {
         }
         this.closed = true;
         for (long view : this.views) {
-            vkDestroyImageView(device, view, null);
+            vkDestroyImageView(this.device, view, null);
         }
         this.views.clear();
         this.defaultView = 0L;
