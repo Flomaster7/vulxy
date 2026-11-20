@@ -4,7 +4,6 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkSamplerCreateInfo;
 
-import java.util.Objects;
 
 import static org.lwjgl.vulkan.VK10.*;
 
