@@ -134,3 +134,7 @@ The compiler and pipeline still need a real Gradle build, shader compilation tes
 - It inserts a compute-to-indirect-draw/graphics memory barrier, then enqueues the command buffer into Minecraft's current encoder submission.
 
 This pass is deliberately isolated and is **not yet called by `MDICSectionRenderer`**. Its buffers must be persistent for the pass lifetime, and the queue-family compatibility check must pass. The next renderer stages still include Vulkan culling, command generation, prefix-sum/translucent sorting, texture/Hi-Z handling and all terrain draw passes.
+
+### Build classpath
+
+Gradle now declares `lwjgl-shaderc` and `lwjgl-vma` as compile-only modules. Minecraft 26.3 already supplies their Java bindings and platform natives at runtime, so Voxy does not bundle a second copy of those native libraries.
