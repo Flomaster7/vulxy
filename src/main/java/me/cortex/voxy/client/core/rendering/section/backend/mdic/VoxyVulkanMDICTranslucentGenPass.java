@@ -121,6 +121,10 @@ public final class VoxyVulkanMDICTranslucentGenPass implements AutoCloseable {
         this.context.endAndEnqueue(commandBuffer);
     }
 
+    boolean usesContext(VoxyVulkanContext context) {
+        return this.context == context;
+    }
+
     @Override
     public void close() {
         if (this.closed) {
