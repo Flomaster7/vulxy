@@ -87,7 +87,7 @@ public final class VoxyVulkanContext {
      */
     public boolean graphicsQueueSupportsCompute() {
         int family = this.graphicsQueueFamilyIndex();
-        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+        VkPhysicalDevice physicalDevice = VoxyGpuDevice.getPhysicalDevice();
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer familyCount = stack.mallocInt(1);
