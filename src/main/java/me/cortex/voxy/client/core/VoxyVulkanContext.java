@@ -4,9 +4,11 @@ import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
 import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkDevice;
+import org.lwjgl.vulkan.VkMemoryBarrier;
 
 /**
  * Narrow bridge from Voxy to Minecraft 26.3's Vulkan implementation.
@@ -86,6 +88,37 @@ public final class VoxyVulkanContext {
      */
     public VkCommandBuffer allocateAndBeginTransientCommandBuffer() {
         return this.commandEncoder.allocateAndBeginTransientCommandBuffer();
+    }
+
+    /**
+     * Adds a compute-write barrier for data that will next be consumed by
+     * indirect drawing, vertex/index input, or graphics shaders.
+     */
+    public void computeToGraphicsBarrier(VkCommandBuffer commandBuffer) {
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack)
+                    .sType$Default()
+                    .srcAccessMask(VK_ACCESS_SHADER_WRITE_BIT)
+                    .dstAccessMask(VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+                            | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+                            | VK_ACCESS_INDEX_READ_BIT
+                            | VK_ACCESS_SHADER_READ_BIT);
+            vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT
+                            | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
+                            | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
+                            | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                    0,
+                    barrier,
+                    null,
+                    null
+            );
+        }
     }
 
     /**
