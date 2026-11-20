@@ -1,8 +1,8 @@
 package me.cortex.voxy.client.core;
 
+import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.shaderc.Shaderc;
-import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -10,17 +10,30 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Owns SPIR-V bytecode compiled from a Vulkan-compatible GLSL compute shader.
+ * Owns SPIR-V bytecode compiled from Voxy GLSL shader assets.
  *
- * Shader includes must be resolved by the caller before compilation. This is
- * deliberate: Voxy's existing OpenGL shader loader has its own include and
- * macro system, and silently ignoring it would compile the wrong program.
- *
- * The returned bytecode is a direct native-order buffer and remains valid
- * until this object is closed.
+ * The Voxy resource loader expands the existing recursive #import tree before
+ * Shaderc compiles the source for Vulkan 1.2 / SPIR-V 1.5. The source still
+ * needs Vulkan-compatible layouts, explicit varying locations, and any
+ * required device feature guards.
  */
 public final class VoxyVulkanSpirv implements AutoCloseable {
+    public enum Stage {
+        VERTEX(Shaderc.shaderc_glsl_vertex_shader, "vertex"),
+        FRAGMENT(Shaderc.shaderc_glsl_fragment_shader, "fragment"),
+        COMPUTE(Shaderc.shaderc_glsl_compute_shader, "compute");
+
+        private final int shadercKind;
+        private final String displayName;
+
+        Stage(int shadercKind, String displayName) {
+            this.shadercKind = shadercKind;
+            this.displayName = displayName;
+        }
+    }
+
     private static final Pattern DEFINE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
     private final ByteBuffer bytecode;
     private final int warningCount;
     private boolean closed;
@@ -30,15 +43,21 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
         this.warningCount = warningCount;
     }
 
-    /**
-     * Compiles preprocessed GLSL compute source for Vulkan 1.2 / SPIR-V 1.5.
-     *
-     * @param source complete GLSL source with all includes already expanded
-     * @param sourceName a useful source name included in compiler diagnostics
-     */
     public static VoxyVulkanSpirv compileCompute(String source, String sourceName) {
+        return compileGlsl(source, sourceName, Stage.COMPUTE);
+    }
+
+    public static VoxyVulkanSpirv compileVertex(String source, String sourceName) {
+        return compileGlsl(source, sourceName, Stage.VERTEX);
+    }
+
+    public static VoxyVulkanSpirv compileFragment(String source, String sourceName) {
+        return compileGlsl(source, sourceName, Stage.FRAGMENT);
+    }
+
+    private static VoxyVulkanSpirv compileGlsl(String source, String sourceName, Stage stage) {
         if (source == null || source.isBlank()) {
-            throw new IllegalArgumentException("Compute shader source must not be empty");
+            throw new IllegalArgumentException(stage.displayName + " shader source must not be empty");
         }
         if (sourceName == null || sourceName.isBlank()) {
             throw new IllegalArgumentException("Shader source name must not be empty");
@@ -68,7 +87,7 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
             result = Shaderc.shaderc_compile_into_spv(
                     compiler,
                     source,
-                    Shaderc.shaderc_glsl_compute_shader,
+                    stage.shadercKind,
                     sourceName,
                     "main",
                     options
@@ -80,7 +99,7 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
             int status = Shaderc.shaderc_result_get_compilation_status(result);
             if (status != Shaderc.shaderc_compilation_status_success) {
                 String diagnostics = Shaderc.shaderc_result_get_error_message(result);
-                throw new IllegalArgumentException("Vulkan compute shader compilation failed for "
+                throw new IllegalArgumentException("Vulkan " + stage.displayName + " shader compilation failed for "
                         + sourceName + " (status " + status + "): "
                         + (diagnostics == null ? "no compiler diagnostics" : diagnostics));
             }
@@ -110,21 +129,37 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
         }
     }
 
-    /**
-     * Loads one of Voxy's existing shader resources, expands its #import tree
-     * with the current ShaderLoader, applies compile-time defines/replacements,
-     * and compiles the result for Vulkan.
-     *
-     * This is the bridge for Voxy's legacy shader assets: it preserves their
-     * import structure while sending GLSL through Shaderc instead of OpenGL.
-     * Only compute shaders that are already Vulkan-compatible can use it;
-     * OpenGL-only extensions and binding assumptions still require migration.
-     */
     public static VoxyVulkanSpirv compileVoxyCompute(String resourceId,
                                                        Map<String, String> defines,
                                                        Map<String, String> replacements) {
+        return compileVoxyShader(resourceId, Stage.COMPUTE, defines, replacements);
+    }
+
+    public static VoxyVulkanSpirv compileVoxyVertex(String resourceId,
+                                                      Map<String, String> defines,
+                                                      Map<String, String> replacements) {
+        return compileVoxyShader(resourceId, Stage.VERTEX, defines, replacements);
+    }
+
+    public static VoxyVulkanSpirv compileVoxyFragment(String resourceId,
+                                                        Map<String, String> defines,
+                                                        Map<String, String> replacements) {
+        return compileVoxyShader(resourceId, Stage.FRAGMENT, defines, replacements);
+    }
+
+    /**
+     * Loads a Voxy shader resource, expands its #import tree, applies explicit
+     * compile-time defines and replacements, then compiles for the selected
+     * Vulkan shader stage.
+     */
+    public static VoxyVulkanSpirv compileVoxyShader(String resourceId, Stage stage,
+                                                      Map<String, String> defines,
+                                                      Map<String, String> replacements) {
         if (resourceId == null || resourceId.isBlank()) {
             throw new IllegalArgumentException("Voxy shader resource id must not be empty");
+        }
+        if (stage == null) {
+            throw new IllegalArgumentException("Vulkan shader stage must not be null");
         }
 
         String source = ShaderLoader.parse(resourceId);
@@ -165,12 +200,9 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
             }
         }
 
-        return compileCompute(expanded.toString(), resourceId);
+        return compileGlsl(expanded.toString(), resourceId, stage);
     }
 
-    /**
-     * Returns a duplicate view of the owned SPIR-V data.
-     */
     public ByteBuffer bytecode() {
         this.checkOpen();
         return this.bytecode.asReadOnlyBuffer().order(ByteOrder.nativeOrder());
