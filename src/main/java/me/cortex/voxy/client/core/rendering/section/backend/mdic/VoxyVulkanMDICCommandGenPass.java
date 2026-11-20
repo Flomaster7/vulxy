@@ -143,7 +143,7 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         if (commandBuffer == null) {
             throw new IllegalArgumentException("Command buffer must not be null");
         }
-        this.context.computeToComputeBarrier(commandBuffer);
+        this.context.computeToComputeAndIndirectBarrier(commandBuffer);
         this.recordDispatch(commandBuffer);
     }
 
