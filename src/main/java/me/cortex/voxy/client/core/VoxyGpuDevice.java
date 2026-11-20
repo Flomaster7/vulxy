@@ -57,7 +57,7 @@ public final class VoxyGpuDevice {
                 : null;
         FrontendCommandEncoder frontendCommandEncoder = null;
         VulkanCommandEncoder vulkanCommandEncoder = null;
-        if (createdDevice instanceof FrontendGpuDevice) {
+        if (vulkanSelected && vulkanDevice != null && createdDevice instanceof FrontendGpuDevice) {
             var encoder = createdDevice.createCommandEncoder();
             if (encoder instanceof FrontendCommandEncoder wrappedEncoder) {
                 frontendCommandEncoder = wrappedEncoder;
