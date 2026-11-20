@@ -2,9 +2,12 @@ package me.cortex.voxy.client.core;
 
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.shaderc.Shaderc;
+import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Owns SPIR-V bytecode compiled from a Vulkan-compatible GLSL compute shader.
@@ -17,6 +20,7 @@ import java.nio.ByteOrder;
  * until this object is closed.
  */
 public final class VoxyVulkanSpirv implements AutoCloseable {
+    private static final Pattern DEFINE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private final ByteBuffer bytecode;
     private final int warningCount;
     private boolean closed;
@@ -104,6 +108,64 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
             }
             Shaderc.shaderc_compiler_release(compiler);
         }
+    }
+
+    /**
+     * Loads one of Voxy's existing shader resources, expands its #import tree
+     * with the current ShaderLoader, applies compile-time defines/replacements,
+     * and compiles the result for Vulkan.
+     *
+     * This is the bridge for Voxy's legacy shader assets: it preserves their
+     * import structure while sending GLSL through Shaderc instead of OpenGL.
+     * Only compute shaders that are already Vulkan-compatible can use it;
+     * OpenGL-only extensions and binding assumptions still require migration.
+     */
+    public static VoxyVulkanSpirv compileVoxyCompute(String resourceId,
+                                                       Map<String, String> defines,
+                                                       Map<String, String> replacements) {
+        if (resourceId == null || resourceId.isBlank()) {
+            throw new IllegalArgumentException("Voxy shader resource id must not be empty");
+        }
+
+        String source = ShaderLoader.parse(resourceId);
+        int firstLineEnd = source.indexOf('\\n');
+        if (firstLineEnd < 0 || !source.startsWith("#version")) {
+            throw new IllegalStateException("Voxy ShaderLoader did not return a GLSL source with a #version line: "
+                    + resourceId);
+        }
+
+        StringBuilder expanded = new StringBuilder(source.length() + 256);
+        expanded.append(source, 0, firstLineEnd + 1);
+        if (defines != null) {
+            for (Map.Entry<String, String> define : defines.entrySet()) {
+                String name = define.getKey();
+                String value = define.getValue();
+                if (name == null || !DEFINE_NAME.matcher(name).matches()) {
+                    throw new IllegalArgumentException("Invalid GLSL define name: " + name);
+                }
+                if (value == null || value.indexOf('\\n') >= 0 || value.indexOf('\\r') >= 0) {
+                    throw new IllegalArgumentException("Invalid GLSL define value for " + name);
+                }
+                expanded.append("#define ").append(name).append(' ').append(value).append('\\n');
+            }
+        }
+        expanded.append(source, firstLineEnd + 1, source.length());
+
+        if (replacements != null) {
+            for (Map.Entry<String, String> replacement : replacements.entrySet()) {
+                if (replacement.getKey() == null || replacement.getKey().isEmpty()
+                        || replacement.getValue() == null) {
+                    throw new IllegalArgumentException("Shader replacements must have non-empty keys and non-null values");
+                }
+                int index = expanded.indexOf(replacement.getKey());
+                while (index >= 0) {
+                    expanded.replace(index, index + replacement.getKey().length(), replacement.getValue());
+                    index = expanded.indexOf(replacement.getKey(), index + replacement.getValue().length());
+                }
+            }
+        }
+
+        return compileCompute(expanded.toString(), resourceId);
     }
 
     /**
