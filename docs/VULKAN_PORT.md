@@ -81,3 +81,14 @@ Vulkan support is not complete until all of the following are true:
 - No OpenGL-only path is reached while Vulkan is active.
 - The existing OpenGL path still builds and works.
 - CI build passes; runtime validation is still required on a real Vulkan GPU.
+
+## Current branch progress
+
+The first code boundary is now in place:
+
+- `VoxyGpuDevice` stores the RenderPearl `GpuDevice` and backend instance after Minecraft successfully creates a device.
+- The Minecraft mixin captures the returned device only after `createDevice` succeeds.
+- Vulkan is still rejected before device creation. This is intentional: Voxy's current renderer still calls OpenGL directly.
+- The captured device is groundwork for replacing Voxy's GL resource layer with RenderPearl resources. It is not yet used to render Voxy frames and does not mean Vulkan support is working.
+
+The next migration target is the buffer/resource layer. In particular, Voxy's persistent mapped buffers and direct OpenGL buffer bindings need explicit replacements before the Vulkan guard can be reconsidered.
