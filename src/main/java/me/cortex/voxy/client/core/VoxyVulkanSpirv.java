@@ -90,7 +90,7 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
                 throw new IllegalStateException("Shaderc returned an invalid SPIR-V byte length: " + byteLength);
             }
 
-            ByteBuffer compiledBytes = Shaderc.shaderc_result_get_bytes(result, byteLength);
+            ByteBuffer compiledBytes = Shaderc.shaderc_result_get_bytes(result);
             if (compiledBytes == null || compiledBytes.remaining() < byteLength) {
                 throw new IllegalStateException("Shaderc returned incomplete SPIR-V bytecode for " + sourceName);
             }
