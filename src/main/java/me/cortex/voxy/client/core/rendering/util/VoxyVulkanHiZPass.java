@@ -65,7 +65,10 @@ public final class VoxyVulkanHiZPass implements AutoCloseable {
         VoxyVulkanSpirv spirv = VoxyVulkanSpirv.compileVoxyCompute(
                 "voxy:hiz/hiz.comp",
                 Map.of(),
-                Map.of()
+                Map.of(
+                        "layout(location = 0) uniform vec2 invImSize;",
+                        "layout(push_constant) uniform VoxyHiZPushConstants { vec2 invImSize; };"
+                )
         );
 
         VoxyVulkanComputePipeline created;
