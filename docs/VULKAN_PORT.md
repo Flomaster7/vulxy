@@ -174,3 +174,16 @@ Hi-Z still assumes mip 0 has already been populated and transitioned to `SHADER_
 The four compute passes now provide `record(VkCommandBuffer)` methods. `VoxyVulkanMDICComputeChain` records command generation, prefix sum and translucent command generation into one transient command buffer, with explicit compute/graphics memory barriers between stages. The one-shot `dispatch()` methods remain available for isolated use.
 
 This keeps the compute-to-compute dependencies in one command buffer, instead of relying on implicit visibility between separately submitted command buffers. The chain is not yet called by the live renderer because the visibility culler and final draw passes still need Vulkan implementations.
+
+### Conservative all-visible fallback for MDIC
+
+A new shader resource, `voxy:lod/vulkan/mark_all_visible.comp`, and `VoxyVulkanMDICAllVisibleFallbackPass` provide a temporary non-occlusion path. It walks the current section lookup list using the indirect dispatch dimensions from `prep.comp`, marks each listed section visible, and preserves the original frame-id / previous-frame temporal bit encoding.
+
+This fallback intentionally does **not** perform frustum or depth-occlusion culling. It is a conservative bring-up option: it should avoid accidentally dropping visible sections, but can render substantially more geometry. It still requires the final Vulkan terrain draw passes before it can be used by the live renderer.
+
+`VoxyVulkanMDICComputeChain` now offers two ordered flows:
+
+- `dispatchAfterVisibilityCulling()`: intended after the future Vulkan raster culler.
+- `dispatchWithAllVisibleFallback(prep, fallback)`: runs prep, all-visible marking, command generation, prefix sum and translucent generation in one transient command buffer.
+
+The indirect dispatch barriers now explicitly include `VK_ACCESS_INDIRECT_COMMAND_READ_BIT` and the draw-indirect pipeline stage where required.
