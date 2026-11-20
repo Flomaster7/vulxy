@@ -122,3 +122,15 @@ These classes are foundations only. No Voxy section renderer uses them yet. The 
 - Compute dispatch through Minecraft's frontend command encoder is now gated on the selected graphics and compute queues sharing a queue family. If they differ, Voxy refuses to dispatch through that encoder rather than recording an invalid command buffer. A dedicated compute-queue submission path, ownership transfers and semaphores are still required for that case.
 
 The compiler and pipeline still need a real Gradle build, shader compilation test and Vulkan runtime validation. Some Voxy shaders also rely on OpenGL-only extensions or capabilities and cannot be assumed to compile unchanged for Vulkan.
+
+### First MDIC pass extracted
+
+`VoxyVulkanMDICPrepPass` is now an isolated Vulkan implementation of the existing `voxy:lod/gl46/prep.comp` step:
+
+- It loads the original Voxy shader resource and expands its existing `#import` files.
+- It compiles the shader to Vulkan SPIR-V through Shaderc.
+- It creates a compute pipeline with binding 0 as a uniform buffer and bindings 1/2 as storage buffers.
+- It records one compute workgroup into a transient command buffer from Minecraft's RenderPearl encoder.
+- It inserts a compute-to-indirect-draw/graphics memory barrier, then enqueues the command buffer into Minecraft's current encoder submission.
+
+This pass is deliberately isolated and is **not yet called by `MDICSectionRenderer`**. Its buffers must be persistent for the pass lifetime, and the queue-family compatibility check must pass. The next renderer stages still include Vulkan culling, command generation, prefix-sum/translucent sorting, texture/Hi-Z handling and all terrain draw passes.
