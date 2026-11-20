@@ -324,6 +324,9 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
         if (pushBytes > this.pushConstantSize || (pushBytes & 3) != 0) {
             throw new IllegalArgumentException("Push constants exceed the declared range or are not 4-byte aligned");
         }
+        if (pushBytes > 0 && !pushConstants.isDirect()) {
+            throw new IllegalArgumentException("Vulkan push constants must be stored in a direct ByteBuffer");
+        }
 
         this.bind(commandBuffer);
         if (pushBytes > 0) {
