@@ -64,9 +64,14 @@ public final class VoxyVulkanMDICPrepPass implements AutoCloseable {
             spirv.close();
         }
 
-        this.pipeline.bindUniformBuffer(0, sceneUniform, 0, sceneUniform.size());
-        this.pipeline.bindStorageBuffer(1, drawCountBuffer, 0, drawCountBuffer.size());
-        this.pipeline.bindStorageBuffer(2, renderListBuffer, 0, renderListBuffer.size());
+        try {
+            this.pipeline.bindUniformBuffer(0, sceneUniform, 0, sceneUniform.size());
+            this.pipeline.bindStorageBuffer(1, drawCountBuffer, 0, drawCountBuffer.size());
+            this.pipeline.bindStorageBuffer(2, renderListBuffer, 0, renderListBuffer.size());
+        } catch (RuntimeException | Error failure) {
+            this.pipeline.close();
+            throw failure;
+        }
     }
 
     /**
