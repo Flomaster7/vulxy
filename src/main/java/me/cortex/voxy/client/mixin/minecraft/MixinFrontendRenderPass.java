@@ -12,4 +12,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface MixinFrontendRenderPass {
     @Accessor("backend")
     RenderPassBackend voxy$getBackend();
+
+    @Accessor("isClosed")
+    boolean voxy$isClosed();
 }
