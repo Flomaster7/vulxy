@@ -1,31 +1,41 @@
 package me.cortex.voxy.client.core;
 
-import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.*;
 
 import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.lwjgl.vulkan.VK10.*;
+import java.util.Collections;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
- * Minimal native Vulkan compute pipeline for Voxy.
+ * Native Vulkan compute pipeline for Voxy.
  *
- * RenderPearl 26.3 currently exposes render pipelines but no public compute
- * pipeline/dispatch API. This class therefore creates a Vulkan compute
- * pipeline against Minecraft's existing VkDevice. It supports one descriptor
- * set containing storage-buffer bindings; sampled images and other descriptor
- * types can be added when Voxy's shaders are migrated.
+ * RenderPearl 26.3 does not expose compute pipelines through its public API,
+ * so this class creates a Vulkan compute pipeline on Minecraft's active
+ * VkDevice. It currently supports storage-buffer and uniform-buffer
+ * descriptors in descriptor set zero. Sampled images and storage images are
+ * intentionally left for a later migration step.
  *
- * The pipeline must only be used with command buffers from VoxyVulkanContext.
- * Do not close it until all GPU submissions that reference it have completed.
+ * The pipeline must only be bound to command buffers from a Vulkan queue
+ * family that supports compute. Do not close it or update descriptors until
+ * all GPU submissions that reference it have completed.
  */
 public final class VoxyVulkanComputePipeline implements AutoCloseable {
+    public enum DescriptorType {
+        STORAGE_BUFFER(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
+        UNIFORM_BUFFER(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+        private final int vkType;
+
+        DescriptorType(int vkType) {
+            this.vkType = vkType;
+        }
+    }
+
     private final VoxyVulkanContext context;
-    private final Set<Integer> storageBindings;
+    private final Map<Integer, DescriptorType> bufferBindings;
     private final int pushConstantSize;
 
     private long descriptorSetLayout;
@@ -36,12 +46,24 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     private boolean closed;
 
     /**
-     * @param spirv a direct ByteBuffer containing compiled SPIR-V words
-     * @param storageBufferBindings descriptor binding numbers for storage buffers
+     * Creates a pipeline whose listed descriptor bindings are all storage buffers.
+     *
+     * @param spirv a direct ByteBuffer containing SPIR-V words
      * @param pushConstantSize push-constant range size in bytes; zero disables it
+     * @param storageBufferBindings descriptor binding numbers in set zero
      */
     public VoxyVulkanComputePipeline(VoxyVulkanContext context, ByteBuffer spirv,
                                      int pushConstantSize, int... storageBufferBindings) {
+        this(context, spirv, pushConstantSize, storageBindingMap(storageBufferBindings));
+    }
+
+    /**
+     * Creates a pipeline with explicit storage/uniform buffer descriptor types.
+     *
+     * @param bufferBindings map of descriptor binding number to descriptor type
+     */
+    public VoxyVulkanComputePipeline(VoxyVulkanContext context, ByteBuffer spirv,
+                                     int pushConstantSize, Map<Integer, DescriptorType> bufferBindings) {
         if (context == null || spirv == null) {
             throw new IllegalArgumentException("Vulkan context and SPIR-V must not be null");
         }
@@ -51,18 +73,23 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
         if (pushConstantSize < 0 || (pushConstantSize & 3) != 0) {
             throw new IllegalArgumentException("Push-constant size must be zero or a positive multiple of four");
         }
-        if (storageBufferBindings == null) {
-            throw new IllegalArgumentException("Storage-buffer bindings must not be null");
+        if (bufferBindings == null) {
+            throw new IllegalArgumentException("Buffer descriptor bindings must not be null");
+        }
+
+        TreeMap<Integer, DescriptorType> copy = new TreeMap<>();
+        for (Map.Entry<Integer, DescriptorType> entry : bufferBindings.entrySet()) {
+            Integer binding = entry.getKey();
+            DescriptorType type = entry.getValue();
+            if (binding == null || binding < 0 || type == null) {
+                throw new IllegalArgumentException("Descriptor binding numbers and types must be valid");
+            }
+            copy.put(binding, type);
         }
 
         this.context = context;
         this.pushConstantSize = pushConstantSize;
-        this.storageBindings = new HashSet<>();
-        for (int binding : storageBufferBindings) {
-            if (binding < 0 || !this.storageBindings.add(binding)) {
-                throw new IllegalArgumentException("Storage-buffer binding numbers must be unique and non-negative");
-            }
-        }
+        this.bufferBindings = Collections.unmodifiableMap(copy);
 
         try {
             this.create(spirv.slice());
@@ -70,6 +97,42 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
             this.destroyHandles();
             throw failure;
         }
+    }
+
+    /**
+     * Creates a pipeline directly from Voxy's owned SPIR-V result.
+     */
+    public VoxyVulkanComputePipeline(VoxyVulkanContext context, VoxyVulkanSpirv spirv,
+                                     int pushConstantSize, int... storageBufferBindings) {
+        this(context, requireBytecode(spirv), pushConstantSize, storageBufferBindings);
+    }
+
+    /**
+     * Creates a pipeline from SPIR-V with explicit storage/uniform descriptors.
+     */
+    public VoxyVulkanComputePipeline(VoxyVulkanContext context, VoxyVulkanSpirv spirv,
+                                     int pushConstantSize, Map<Integer, DescriptorType> bufferBindings) {
+        this(context, requireBytecode(spirv), pushConstantSize, bufferBindings);
+    }
+
+    private static ByteBuffer requireBytecode(VoxyVulkanSpirv spirv) {
+        if (spirv == null) {
+            throw new IllegalArgumentException("SPIR-V result must not be null");
+        }
+        return spirv.bytecode();
+    }
+
+    private static Map<Integer, DescriptorType> storageBindingMap(int[] bindings) {
+        if (bindings == null) {
+            throw new IllegalArgumentException("Storage-buffer bindings must not be null");
+        }
+        Map<Integer, DescriptorType> result = new TreeMap<>();
+        for (int binding : bindings) {
+            if (binding < 0 || result.put(binding, DescriptorType.STORAGE_BUFFER) != null) {
+                throw new IllegalArgumentException("Storage-buffer binding numbers must be unique and non-negative");
+            }
+        }
+        return result;
     }
 
     private void create(ByteBuffer spirv) {
@@ -83,14 +146,14 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
             long shaderModule = shaderOut.get(0);
 
             try {
-                if (!this.storageBindings.isEmpty()) {
+                if (!this.bufferBindings.isEmpty()) {
                     VkDescriptorSetLayoutBinding.Buffer bindings =
-                            VkDescriptorSetLayoutBinding.calloc(this.storageBindings.size(), stack);
+                            VkDescriptorSetLayoutBinding.calloc(this.bufferBindings.size(), stack);
                     int index = 0;
-                    for (int binding : this.storageBindings) {
+                    for (Map.Entry<Integer, DescriptorType> entry : this.bufferBindings.entrySet()) {
                         bindings.get(index++)
-                                .binding(binding)
-                                .descriptorType(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                                .binding(entry.getKey())
+                                .descriptorType(entry.getValue().vkType)
                                 .descriptorCount(1)
                                 .stageFlags(VK_SHADER_STAGE_COMPUTE_BIT);
                     }
@@ -141,10 +204,19 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                 vkDestroyShaderModule(device, shaderModule, null);
             }
 
-            if (!this.storageBindings.isEmpty()) {
-                VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(1, stack)
-                        .type(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-                        .descriptorCount(this.storageBindings.size());
+            if (!this.bufferBindings.isEmpty()) {
+                Map<Integer, Integer> descriptorCounts = new TreeMap<>();
+                for (DescriptorType type : this.bufferBindings.values()) {
+                    descriptorCounts.merge(type.vkType, 1, Integer::sum);
+                }
+
+                VkDescriptorPoolSize.Buffer poolSizes = VkDescriptorPoolSize.calloc(descriptorCounts.size(), stack);
+                int index = 0;
+                for (Map.Entry<Integer, Integer> entry : descriptorCounts.entrySet()) {
+                    poolSizes.get(index++)
+                            .type(entry.getKey())
+                            .descriptorCount(entry.getValue());
+                }
 
                 VkDescriptorPoolCreateInfo poolInfo = VkDescriptorPoolCreateInfo.calloc(stack)
                         .sType$Default()
@@ -166,31 +238,17 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     }
 
     /**
-     * Compiles a compute pipeline directly from Voxy's owned SPIR-V result.
+     * Writes or replaces a storage/uniform buffer descriptor in set zero.
      */
-    public VoxyVulkanComputePipeline(VoxyVulkanContext context, VoxyVulkanSpirv spirv,
-                                     int pushConstantSize, int... storageBufferBindings) {
-        this(context, requireBytecode(spirv), pushConstantSize, storageBufferBindings);
-    }
-
-    private static ByteBuffer requireBytecode(VoxyVulkanSpirv spirv) {
-        if (spirv == null) {
-            throw new IllegalArgumentException("SPIR-V result must not be null");
-        }
-        return spirv.bytecode();
-    }
-
-    /**
-     * Writes or replaces one storage-buffer descriptor in set zero.
-     */
-    public void bindStorageBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
+    public void bindBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
         this.checkOpen();
-        if (!this.storageBindings.contains(binding)) {
-            throw new IllegalArgumentException("Pipeline has no storage-buffer binding " + binding);
+        DescriptorType type = this.bufferBindings.get(binding);
+        if (type == null) {
+            throw new IllegalArgumentException("Pipeline has no buffer descriptor at binding " + binding);
         }
         if (buffer == null || range <= 0 || offset < 0 || offset > buffer.size()
                 || range > buffer.size() - offset) {
-            throw new IllegalArgumentException("Invalid storage-buffer range");
+            throw new IllegalArgumentException("Invalid buffer descriptor range");
         }
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -204,17 +262,29 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                     .dstSet(this.descriptorSet)
                     .dstBinding(binding)
                     .descriptorCount(1)
-                    .descriptorType(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+                    .descriptorType(type.vkType)
                     .pBufferInfo(bufferInfo);
             vkUpdateDescriptorSets(this.context.vkDevice(), write, null);
         }
     }
 
+    public void bindStorageBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
+        this.requireDescriptorType(binding, DescriptorType.STORAGE_BUFFER);
+        this.bindBuffer(binding, buffer, offset, range);
+    }
+
+    public void bindUniformBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
+        this.requireDescriptorType(binding, DescriptorType.UNIFORM_BUFFER);
+        this.bindBuffer(binding, buffer, offset, range);
+    }
+
     /**
      * Binds this compute pipeline and its descriptor set to a command buffer.
+     * Use context.allocateAndBeginComputeCommandBuffer() for that command buffer.
      */
     public void bind(VkCommandBuffer commandBuffer) {
         this.checkOpen();
+        this.context.requireComputeOnFrontendQueue();
         if (commandBuffer == null) {
             throw new IllegalArgumentException("Command buffer must not be null");
         }
@@ -267,6 +337,13 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
         }
         this.destroyHandles();
         this.closed = true;
+    }
+
+    private void requireDescriptorType(int binding, DescriptorType required) {
+        this.checkOpen();
+        if (this.bufferBindings.get(binding) != required) {
+            throw new IllegalArgumentException("Binding " + binding + " is not a " + required + " descriptor");
+        }
     }
 
     private void destroyHandles() {
