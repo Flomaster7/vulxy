@@ -383,6 +383,9 @@ dependencies {
         include(implementation "org.lwjgl:lwjgl-zstd:unsafe")
     } else {
         implementation "org.lwjgl:lwjgl"
+    // Minecraft 26.3 provides these LWJGL modules at runtime; Voxy only needs their Java bindings to compile.
+    compileOnly "org.lwjgl:lwjgl-shaderc"
+    compileOnly "org.lwjgl:lwjgl-vma"
         include(implementation "org.lwjgl:lwjgl-lmdb")
         include(implementation "org.lwjgl:lwjgl-zstd")
     }
