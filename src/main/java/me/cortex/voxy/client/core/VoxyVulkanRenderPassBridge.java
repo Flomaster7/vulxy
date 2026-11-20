@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanRenderPass;
 import com.mojang.renderpearl.frontend.FrontendRenderPass;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendRenderPass;
