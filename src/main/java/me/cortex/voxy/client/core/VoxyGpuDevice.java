@@ -15,7 +15,6 @@ import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
  */
 public final class VoxyGpuDevice {
     public enum Backend {
-        OPENGL,
         VULKAN,
         OTHER
     }
@@ -38,9 +37,8 @@ public final class VoxyGpuDevice {
 
         if (selectedBackend instanceof VulkanBackend) {
             backend = Backend.VULKAN;
-        } else if (selectedBackend.getClass().getName().toLowerCase().contains("gl")) {
-            backend = Backend.OPENGL;
         } else {
+            // Do not infer a concrete API from implementation class names.
             backend = Backend.OTHER;
         }
 
