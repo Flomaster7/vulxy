@@ -92,3 +92,24 @@ The first code boundary is now in place:
 - The captured device is groundwork for replacing Voxy's GL resource layer with RenderPearl resources. It is not yet used to render Voxy frames and does not mean Vulkan support is working.
 
 The next migration target is the buffer/resource layer. In particular, Voxy's persistent mapped buffers and direct OpenGL buffer bindings need explicit replacements before the Vulkan guard can be reconsidered.
+
+## Native Vulkan groundwork added
+
+The branch now contains a narrow Vulkan bridge and initial resource primitives:
+
+- `MixinFrontendGpuDevice` exposes the selected RenderPearl backend.
+- `VoxyGpuDevice` captures the actual Minecraft device and extracts the backend encoder from the existing `FrontendCommandEncoder`. It does not create a second command encoder.
+- `VoxyVulkanContext` exposes Minecraft's Vulkan device, queues and VMA allocator. It can allocate transient command buffers from Minecraft's encoder, end and enqueue them, and issue a compute-write-to-graphics-read barrier.
+- `VoxyVulkanBuffer` creates VMA-backed Vulkan buffers, including storage buffers and mapped host-write/read allocations. Callers must keep allocations alive until their GPU work has completed.
+- `VoxyVulkanComputePipeline` creates a native compute pipeline from precompiled SPIR-V and supports a descriptor set of storage-buffer bindings plus push constants.
+
+These classes are foundations only. No Voxy section renderer uses them yet. The existing OpenGL renderer remains active, and the Vulkan rejection guard remains in place.
+
+### Remaining blockers before enabling Voxy on Vulkan
+
+- Compile Voxy's existing shader sources to Vulkan SPIR-V and map their resource layouts.
+- Port the MDIC visibility/command-generation compute passes to the new pipeline and storage-buffer resources.
+- Replace OpenGL fences, upload/download streams, textures, samplers and framebuffer usage.
+- Port terrain drawing, including opaque, translucent and temporal passes, to Vulkan render passes/pipelines.
+- Verify queue-family compatibility, barriers, resource lifetime and render-thread scheduling on real Vulkan hardware.
+- Run a full Gradle build and runtime tests. The new primitives have not yet been build- or runtime-verified.
