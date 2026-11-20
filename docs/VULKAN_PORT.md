@@ -138,3 +138,22 @@ This pass is deliberately isolated and is **not yet called by `MDICSectionRender
 ### Build classpath
 
 Gradle now declares `lwjgl-shaderc` and `lwjgl-vma` as compile-only modules. Minecraft 26.3 already supplies their Java bindings and platform natives at runtime, so Voxy does not bundle a second copy of those native libraries.
+
+### More MDIC compute stages extracted
+
+The native compute path now has isolated passes for the next three stages:
+
+- `VoxyVulkanMDICCommandGenPass` compiles `lod/gl46/cmdgen.comp`, binds the scene uniform plus seven storage-buffer roles (and optional statistics binding 8), then dispatches indirectly from the command triplet written by `prep.comp`.
+- `VoxyVulkanMDICPrefixSumPass` compiles the existing simple 256-lane prefix-sum shader. This is the correctness-first path and does not require subgroup-size assumptions.
+- `VoxyVulkanMDICTranslucentGenPass` compiles `lod/gl46/buildtranslucents.comp` and creates the final translucent indirect commands using the prefix-summed distance buckets.
+
+The pass ordering is intended to be:
+
+1. Prep dispatch
+2. Raster visibility/culling (not ported yet)
+3. Graphics-to-compute barrier, then command generation
+4. Compute-to-compute barrier, then prefix sum
+5. Compute-to-compute barrier, then translucent command generation
+6. Compute-to-graphics barrier, then opaque/translucent/temporal drawing
+
+These classes remain isolated and are not called by the existing OpenGL MDIC renderer. They still need a build, SPIR-V validation, and device testing. The raster visibility/culling stage and all Vulkan draw passes remain outstanding.
