@@ -113,3 +113,12 @@ These classes are foundations only. No Voxy section renderer uses them yet. The 
 - Port terrain drawing, including opaque, translucent and temporal passes, to Vulkan render passes/pipelines.
 - Verify queue-family compatibility, barriers, resource lifetime and render-thread scheduling on real Vulkan hardware.
 - Run a full Gradle build and runtime tests. The new primitives have not yet been build- or runtime-verified.
+
+### Shader compilation and queue safety
+
+- `VoxyVulkanSpirv` now compiles compute GLSL through LWJGL Shaderc for Vulkan 1.2 / SPIR-V 1.5.
+- `compileVoxyCompute` loads Voxy shader assets through the existing `ShaderLoader`, so Voxy's recursive `#import` tree is expanded before Shaderc sees the source. Compile-time defines and textual replacements can be supplied explicitly.
+- The compute pipeline now supports both storage-buffer and uniform-buffer descriptors. This is enough for the descriptor shape used by the first small Voxy compute pass (`lod/gl46/prep.comp`), but it does not yet mean that pass is scheduled by the renderer.
+- Compute dispatch through Minecraft's frontend command encoder is now gated on the selected graphics and compute queues sharing a queue family. If they differ, Voxy refuses to dispatch through that encoder rather than recording an invalid command buffer. A dedicated compute-queue submission path, ownership transfers and semaphores are still required for that case.
+
+The compiler and pipeline still need a real Gradle build, shader compilation test and Vulkan runtime validation. Some Voxy shaders also rely on OpenGL-only extensions or capabilities and cannot be assumed to compile unchanged for Vulkan.
