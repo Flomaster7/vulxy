@@ -36,6 +36,7 @@ public final class VoxyVulkanBuffer implements AutoCloseable {
     private final long buffer;
     private final long allocation;
     private final long size;
+    private final int usage;
     private final long mappedAddress;
     private boolean closed;
 
@@ -58,6 +59,7 @@ public final class VoxyVulkanBuffer implements AutoCloseable {
             throw new IllegalStateException("Minecraft's Vulkan VMA allocator is not initialized");
         }
         this.size = size;
+        this.usage = usage;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkBufferCreateInfo bufferInfo = VkBufferCreateInfo.calloc(stack)
@@ -126,6 +128,14 @@ public final class VoxyVulkanBuffer implements AutoCloseable {
 
     public long size() {
         return this.size;
+    }
+
+    public int usage() {
+        return this.usage;
+    }
+
+    public boolean supportsUsage(int requiredUsage) {
+        return (this.usage & requiredUsage) == requiredUsage;
     }
 
     public boolean isMapped() {
