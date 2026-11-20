@@ -157,7 +157,7 @@ public final class VoxyVulkanImage implements AutoCloseable {
                     .subresourceRange(range);
 
             LongBuffer viewOut = stack.mallocLong(1);
-            int result = vkCreateImageView(this.device(), viewInfo, null, viewOut);
+            int result = vkCreateImageView(this.device, viewInfo, null, viewOut);
             if (result != VK_SUCCESS) {
                 throw new IllegalStateException("vkCreateImageView failed with VkResult " + result);
             }
