@@ -9,6 +9,10 @@ import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMemoryBarrier;
+import org.lwjgl.vulkan.VkPhysicalDevice;
+import org.lwjgl.vulkan.VkQueueFamilyProperties;
+
+import java.nio.IntBuffer;
 
 import static org.lwjgl.vulkan.VK10.*;
 
@@ -71,16 +75,33 @@ public final class VoxyVulkanContext {
     }
 
     /**
-     * The frontend encoder records its transient buffers for Minecraft's
-     * graphics queue. Vulkan permits compute dispatch on that command buffer
-     * only when the graphics queue family also advertises compute support.
-     * RenderPearl's public API does not expose the queue-family flags here, so
-     * a shared family with the device's selected compute queue is the safe
-     * condition to require.
+     * The frontend encoder records transient command buffers for Minecraft's
+     * graphics queue. That queue can also run compute if its physical-device
+     * queue-family properties include VK_QUEUE_COMPUTE_BIT. This is more
+     * accurate than requiring it to be the same family as RenderPearl's
+     * separately selected compute queue.
      */
+    public boolean graphicsQueueSupportsCompute() {
+        int family = this.graphicsQueueFamilyIndex();
+        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer familyCount = stack.mallocInt(1);
+            vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, familyCount, null);
+            int count = familyCount.get(0);
+            if (family < 0 || family >= count) {
+                return false;
+            }
+
+            VkQueueFamilyProperties.Buffer properties =
+                    VkQueueFamilyProperties.malloc(count, stack);
+            vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, familyCount, properties);
+            return (properties.get(family).queueFlags() & VK_QUEUE_COMPUTE_BIT) != 0;
+        }
+    }
+
     public boolean canDispatchComputeOnFrontendQueue() {
-        return this.hasComputeQueue()
-                && this.graphicsQueueFamilyIndex() == this.computeQueueFamilyIndex();
+        return this.graphicsQueueSupportsCompute();
     }
 
     public void requireComputeOnFrontendQueue() {
@@ -88,9 +109,7 @@ public final class VoxyVulkanContext {
             throw new IllegalStateException(
                     "Voxy compute cannot use Minecraft's frontend command encoder: graphics queue family "
                             + this.graphicsQueueFamilyIndex()
-                            + " differs from compute queue family "
-                            + this.computeQueueFamilyIndex()
-                            + ". A dedicated compute submission path is required for this GPU."
+                            + " does not advertise VK_QUEUE_COMPUTE_BIT. A dedicated compute submission path is required for this GPU."
             );
         }
     }
