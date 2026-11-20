@@ -64,16 +64,23 @@ public final class VoxyVulkanMDICPrefixSumPass implements AutoCloseable {
      * Runs the 256-lane prefix sum after cmdgen has populated distance buckets.
      * The resulting offsets are consumed by the translucent command generator.
      */
+    public void record(VkCommandBuffer commandBuffer) {
+        this.checkOpen();
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        this.context.computeToComputeBarrier(commandBuffer);
+        this.pipeline.dispatch(commandBuffer, null, 1, 1, 1);
+        this.context.computeToComputeBarrier(commandBuffer);
+    }
+
     public void dispatch() {
         this.checkOpen();
         if (this.context.isInRenderPass()) {
             throw new IllegalStateException("MDIC prefix sum must run outside an active render pass");
         }
-
         VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
-        this.context.computeToComputeBarrier(commandBuffer);
-        this.pipeline.dispatch(commandBuffer, null, 1, 1, 1);
-        this.context.computeToComputeBarrier(commandBuffer);
+        this.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
     }
 
