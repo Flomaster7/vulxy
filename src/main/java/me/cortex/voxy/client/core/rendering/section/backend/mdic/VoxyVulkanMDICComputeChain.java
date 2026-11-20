@@ -64,4 +64,36 @@ public final class VoxyVulkanMDICComputeChain {
         this.translucentGeneration.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
     }
+
+    /**
+     * Runs a correctness-first path without the raster visibility culler.
+     *
+     * The prep pass creates indirect dispatch parameters, the fallback marks
+     * every section in the current list visible, and the remaining MDIC
+     * compute passes generate indirect draw commands. This avoids false-
+     * negative culling but may render substantially more geometry.
+     */
+    public void dispatchWithAllVisibleFallback(
+            VoxyVulkanMDICPrepPass prep,
+            VoxyVulkanMDICAllVisibleFallbackPass visibilityFallback
+    ) {
+        if (prep == null || visibilityFallback == null) {
+            throw new IllegalArgumentException("Prep and visibility fallback passes must not be null");
+        }
+        if (!prep.usesContext(this.context) || !visibilityFallback.usesContext(this.context)) {
+            throw new IllegalArgumentException("All MDIC passes must use the same Vulkan context");
+        }
+        if (this.context.isInRenderPass()) {
+            throw new IllegalStateException("MDIC compute chain must run outside an active RenderPearl render pass");
+        }
+
+        VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
+        prep.record(commandBuffer);
+        visibilityFallback.record(commandBuffer);
+        this.commandGeneration.recordAfterComputeVisibility(commandBuffer);
+        this.prefixSum.record(commandBuffer);
+        this.translucentGeneration.record(commandBuffer);
+        this.context.endAndEnqueue(commandBuffer);
+    }
+
 }
