@@ -57,8 +57,8 @@ public final class VoxyVulkanGraphicsCommands {
         if (indexBufferOffset < 0 || indexBufferOffset >= indexBuffer.size()) {
             throw new IllegalArgumentException("Index buffer offset is outside the buffer");
         }
-        if (drawCount <= 0) {
-            throw new IllegalArgumentException("Indirect draw count must be positive");
+        if (drawCount != 1) {
+            throw new IllegalArgumentException("This initial helper only guarantees single-command indirect draws; multiDrawIndirect must be checked separately");
         }
         if (stride < 20 || (stride & 3) != 0) {
             throw new IllegalArgumentException("VkDrawIndexedIndirectCommand stride must be at least 20 and 4-byte aligned");
