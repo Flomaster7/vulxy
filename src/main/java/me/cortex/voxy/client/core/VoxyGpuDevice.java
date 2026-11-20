@@ -7,6 +7,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
+import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
