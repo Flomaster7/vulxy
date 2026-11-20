@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanQueue;
+import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import org.lwjgl.vulkan.VK10;
 import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkDevice;
@@ -19,13 +20,16 @@ import org.lwjgl.vulkan.VkDevice;
  */
 public final class VoxyVulkanContext {
     private final VulkanDevice device;
+    private final FrontendCommandEncoder frontendEncoder;
     private final VulkanCommandEncoder commandEncoder;
 
-    VoxyVulkanContext(VulkanDevice device, VulkanCommandEncoder commandEncoder) {
-        if (device == null || commandEncoder == null) {
-            throw new IllegalArgumentException("Vulkan device and Minecraft command encoder must not be null");
+    VoxyVulkanContext(VulkanDevice device, FrontendCommandEncoder frontendEncoder,
+                      VulkanCommandEncoder commandEncoder) {
+        if (device == null || frontendEncoder == null || commandEncoder == null) {
+            throw new IllegalArgumentException("Vulkan device and Minecraft command encoders must not be null");
         }
         this.device = device;
+        this.frontendEncoder = frontendEncoder;
         this.commandEncoder = commandEncoder;
     }
 
@@ -62,10 +66,18 @@ public final class VoxyVulkanContext {
     }
 
     /**
-     * Returns the exact encoder used by Minecraft's RenderPearl frontend.
+     * Returns the exact backend encoder used by Minecraft's RenderPearl frontend.
      */
     public VulkanCommandEncoder commandEncoder() {
         return this.commandEncoder;
+    }
+
+    /**
+     * True while Minecraft's public encoder has an active render pass. Voxy
+     * must not insert a custom Vulkan submission until that pass has ended.
+     */
+    public boolean isInRenderPass() {
+        return this.frontendEncoder.isInRenderPass();
     }
 
     /**
@@ -79,11 +91,14 @@ public final class VoxyVulkanContext {
     /**
      * Ends and inserts a transient command buffer into Minecraft's current
      * submission. It must have been obtained from this encoder and must not
-     * have been submitted before.
+     * have been submitted before. It is only safe outside an active render pass.
      */
     public void endAndEnqueue(VkCommandBuffer commandBuffer) {
         if (commandBuffer == null) {
             throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        if (this.frontendEncoder.isInRenderPass()) {
+            throw new IllegalStateException("Close the active RenderPearl render pass before enqueueing Vulkan commands");
         }
         int result = VK10.vkEndCommandBuffer(commandBuffer);
         if (result != VK10.VK_SUCCESS) {
