@@ -25,7 +25,9 @@ import java.util.TreeMap;
 public final class VoxyVulkanComputePipeline implements AutoCloseable {
     public enum DescriptorType {
         STORAGE_BUFFER(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
-        UNIFORM_BUFFER(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        UNIFORM_BUFFER(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER),
+        COMBINED_IMAGE_SAMPLER(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        STORAGE_IMAGE(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
         private final int vkType;
 
@@ -250,6 +252,9 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                 || range > buffer.size() - offset) {
             throw new IllegalArgumentException("Invalid buffer descriptor range");
         }
+        if (type != DescriptorType.STORAGE_BUFFER && type != DescriptorType.UNIFORM_BUFFER) {
+            throw new IllegalArgumentException("Binding " + binding + " is an image descriptor, not a buffer descriptor");
+        }
         int requiredUsage = type == DescriptorType.STORAGE_BUFFER
                 ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
                 : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
@@ -284,6 +289,72 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     public void bindUniformBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
         this.requireDescriptorType(binding, DescriptorType.UNIFORM_BUFFER);
         this.bindBuffer(binding, buffer, offset, range);
+    }
+
+    /**
+     * Binds an image view to a storage-image descriptor in set zero.
+     * The image must have been created with VK_IMAGE_USAGE_STORAGE_BIT and
+     * transitioned to the supplied layout before dispatch.
+     */
+    public void bindStorageImage(int binding, VoxyVulkanImage image, long imageView, int imageLayout) {
+        this.checkOpen();
+        this.requireDescriptorType(binding, DescriptorType.STORAGE_IMAGE);
+        if (image == null || imageView == 0L) {
+            throw new IllegalArgumentException("Storage image and image view must not be null");
+        }
+        if (!image.supportsUsage(VK_IMAGE_USAGE_STORAGE_BIT)) {
+            throw new IllegalArgumentException("Image lacks VK_IMAGE_USAGE_STORAGE_BIT");
+        }
+        this.writeImageDescriptor(binding, imageView, 0L, imageLayout);
+    }
+
+    public void bindStorageImage(int binding, VoxyVulkanImage image, int imageLayout) {
+        if (image == null) {
+            throw new IllegalArgumentException("Storage image must not be null");
+        }
+        this.bindStorageImage(binding, image, image.view(), imageLayout);
+    }
+
+    /**
+     * Binds a sampled image and sampler to a combined-image-sampler descriptor.
+     */
+    public void bindCombinedImageSampler(int binding, VoxyVulkanImage image, long imageView,
+                                         VoxyVulkanSampler sampler, int imageLayout) {
+        this.checkOpen();
+        this.requireDescriptorType(binding, DescriptorType.COMBINED_IMAGE_SAMPLER);
+        if (image == null || imageView == 0L || sampler == null) {
+            throw new IllegalArgumentException("Sampled image, view, and sampler must not be null");
+        }
+        if (!image.supportsUsage(VK_IMAGE_USAGE_SAMPLED_BIT)) {
+            throw new IllegalArgumentException("Image lacks VK_IMAGE_USAGE_SAMPLED_BIT");
+        }
+        this.writeImageDescriptor(binding, imageView, sampler.sampler(), imageLayout);
+    }
+
+    public void bindCombinedImageSampler(int binding, VoxyVulkanImage image,
+                                         VoxyVulkanSampler sampler, int imageLayout) {
+        if (image == null) {
+            throw new IllegalArgumentException("Sampled image must not be null");
+        }
+        this.bindCombinedImageSampler(binding, image, image.view(), sampler, imageLayout);
+    }
+
+    private void writeImageDescriptor(int binding, long imageView, long sampler, int imageLayout) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkDescriptorImageInfo.Buffer imageInfo = VkDescriptorImageInfo.calloc(1, stack)
+                    .sampler(sampler)
+                    .imageView(imageView)
+                    .imageLayout(imageLayout);
+            VkWriteDescriptorSet.Buffer write = VkWriteDescriptorSet.calloc(1, stack);
+            write.get(0)
+                    .sType$Default()
+                    .dstSet(this.descriptorSet)
+                    .dstBinding(binding)
+                    .descriptorCount(1)
+                    .descriptorType(this.bufferBindings.get(binding).vkType)
+                    .pImageInfo(imageInfo);
+            vkUpdateDescriptorSets(this.context.vkDevice(), write, null);
+        }
     }
 
     /**
