@@ -58,11 +58,14 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         this.dispatchBuffer = drawCountBuffer;
         this.statisticsEnabled = statisticsBuffer != null;
 
-        Map<String, String> defines = Map.of(
-                "TRANSLUCENT_WRITE_BASE", Integer.toString(TRANSLUCENT_WRITE_BASE),
-                "TEMPORAL_OFFSET", Integer.toString(TEMPORAL_OFFSET),
-                "TRANSLUCENT_DISTANCE_BUFFER_BINDING", "7"
-        );
+        Map<String, String> defines = new TreeMap<>();
+        defines.put("TRANSLUCENT_WRITE_BASE", Integer.toString(TRANSLUCENT_WRITE_BASE));
+        defines.put("TEMPORAL_OFFSET", Integer.toString(TEMPORAL_OFFSET));
+        defines.put("TRANSLUCENT_DISTANCE_BUFFER_BINDING", "7");
+        if (this.statisticsEnabled) {
+            defines.put("HAS_STATISTICS", "");
+            defines.put("STATISTICS_BUFFER_BINDING", Integer.toString(STATISTICS_BINDING));
+        }
         Map<String, String> replacements = Map.of();
         VoxyVulkanSpirv spirv = VoxyVulkanSpirv.compileVoxyCompute(
                 "voxy:lod/gl46/cmdgen.comp",
