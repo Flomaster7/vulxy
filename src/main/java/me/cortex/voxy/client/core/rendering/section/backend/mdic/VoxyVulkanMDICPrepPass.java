@@ -41,6 +41,10 @@ public final class VoxyVulkanMDICPrepPass implements AutoCloseable {
         if (!context.canDispatchComputeOnFrontendQueue()) {
             throw new IllegalStateException("MDIC prep needs a graphics command queue that supports compute");
         }
+        if (!drawCountBuffer.supportsUsage(org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                | org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)) {
+            throw new IllegalArgumentException("MDIC draw-count buffer must support storage and indirect usage");
+        }
 
         this.context = context;
         VoxyVulkanSpirv spirv = VoxyVulkanSpirv.compileVoxyCompute(
@@ -98,6 +102,10 @@ public final class VoxyVulkanMDICPrepPass implements AutoCloseable {
         VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
         this.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
+    }
+
+    boolean usesContext(VoxyVulkanContext context) {
+        return this.context == context;
     }
 
     @Override
