@@ -81,15 +81,22 @@ public final class VoxyVulkanMDICPrepPass implements AutoCloseable {
      * consumes drawCountBuffer's indirect command. The following barrier makes
      * compute writes visible to indirect drawing and graphics shader reads.
      */
+    public void record(VkCommandBuffer commandBuffer) {
+        this.checkOpen();
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        this.pipeline.dispatch(commandBuffer, null, 1, 1, 1);
+        this.context.computeToGraphicsBarrier(commandBuffer);
+    }
+
     public void dispatch() {
         this.checkOpen();
         if (this.context.isInRenderPass()) {
             throw new IllegalStateException("MDIC prep must run outside an active render pass");
         }
-
         VkCommandBuffer commandBuffer = this.context.allocateAndBeginComputeCommandBuffer();
-        this.pipeline.dispatch(commandBuffer, null, 1, 1, 1);
-        this.context.computeToGraphicsBarrier(commandBuffer);
+        this.record(commandBuffer);
         this.context.endAndEnqueue(commandBuffer);
     }
 
