@@ -115,7 +115,7 @@ public final class VoxyVulkanContext {
      * runtime device supports the emitted SPIR-V capabilities.
      */
     public boolean supportsComputeSubgroupOperations(int requiredOperations) {
-        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+        VkPhysicalDevice physicalDevice = VoxyGpuDevice.getPhysicalDevice();
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkPhysicalDeviceSubgroupProperties subgroup =
                     VkPhysicalDeviceSubgroupProperties.calloc(stack).sType$Default();
@@ -146,7 +146,7 @@ public final class VoxyVulkanContext {
         if (format <= 0 || requiredFeatures == 0) {
             throw new IllegalArgumentException("Format and required feature flags must be valid");
         }
-        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+        VkPhysicalDevice physicalDevice = VoxyGpuDevice.getPhysicalDevice();
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkFormatProperties properties = VkFormatProperties.calloc(stack);
             vkGetPhysicalDeviceFormatProperties(physicalDevice, format, properties);
