@@ -11,6 +11,9 @@ import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
+import org.lwjgl.vulkan.VkPhysicalDeviceProperties2;
+import org.lwjgl.vulkan.VkPhysicalDeviceSubgroupProperties;
+import org.lwjgl.vulkan.VK11;
 
 import java.nio.IntBuffer;
 
@@ -102,6 +105,36 @@ public final class VoxyVulkanContext {
 
     public boolean canDispatchComputeOnFrontendQueue() {
         return this.graphicsQueueSupportsCompute();
+    }
+
+    /**
+     * Checks subgroup operations advertised for compute shaders by the
+     * physical device. This is required before compiling Voxy's clustered
+     * subgroup Hi-Z shader; shader compilation alone does not prove the
+     * runtime device supports the emitted SPIR-V capabilities.
+     */
+    public boolean supportsComputeSubgroupOperations(int requiredOperations) {
+        VkPhysicalDevice physicalDevice = this.device.vkDevice().getPhysicalDevice();
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkPhysicalDeviceSubgroupProperties subgroup =
+                    VkPhysicalDeviceSubgroupProperties.calloc(stack).sType$Default();
+            VkPhysicalDeviceProperties2 properties =
+                    VkPhysicalDeviceProperties2.calloc(stack)
+                            .sType$Default()
+                            .pNext(subgroup.address());
+            VK11.vkGetPhysicalDeviceProperties2(physicalDevice, properties);
+
+            return (subgroup.supportedStages() & VK_SHADER_STAGE_COMPUTE_BIT) != 0
+                    && (subgroup.supportedOperations() & requiredOperations) == requiredOperations;
+        }
+    }
+
+    public boolean supportsClusteredComputeSubgroups() {
+        return this.supportsComputeSubgroupOperations(
+                VK11.VK_SUBGROUP_FEATURE_BASIC_BIT
+                        | VK11.VK_SUBGROUP_FEATURE_ARITHMETIC_BIT
+                        | VK11.VK_SUBGROUP_FEATURE_CLUSTERED_BIT
+        );
     }
 
     public void requireComputeOnFrontendQueue() {
