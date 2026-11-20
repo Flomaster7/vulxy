@@ -250,6 +250,14 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                 || range > buffer.size() - offset) {
             throw new IllegalArgumentException("Invalid buffer descriptor range");
         }
+        int requiredUsage = type == DescriptorType.STORAGE_BUFFER
+                ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        if (!buffer.supportsUsage(requiredUsage)) {
+            throw new IllegalArgumentException("Buffer at descriptor binding " + binding
+                    + " was not created with required Vulkan usage flag 0x"
+                    + Integer.toHexString(requiredUsage));
+        }
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
             VkDescriptorBufferInfo.Buffer bufferInfo = VkDescriptorBufferInfo.calloc(1, stack)
