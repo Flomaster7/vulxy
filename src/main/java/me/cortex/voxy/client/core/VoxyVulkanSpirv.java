@@ -128,7 +128,7 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
         }
 
         String source = ShaderLoader.parse(resourceId);
-        int firstLineEnd = source.indexOf('\\n');
+        int firstLineEnd = source.indexOf('\n');
         if (firstLineEnd < 0 || !source.startsWith("#version")) {
             throw new IllegalStateException("Voxy ShaderLoader did not return a GLSL source with a #version line: "
                     + resourceId);
@@ -143,10 +143,10 @@ public final class VoxyVulkanSpirv implements AutoCloseable {
                 if (name == null || !DEFINE_NAME.matcher(name).matches()) {
                     throw new IllegalArgumentException("Invalid GLSL define name: " + name);
                 }
-                if (value == null || value.indexOf('\\n') >= 0 || value.indexOf('\\r') >= 0) {
+                if (value == null || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
                     throw new IllegalArgumentException("Invalid GLSL define value for " + name);
                 }
-                expanded.append("#define ").append(name).append(' ').append(value).append('\\n');
+                expanded.append("#define ").append(name).append(' ').append(value).append('\n');
             }
         }
         expanded.append(source, firstLineEnd + 1, source.length());
