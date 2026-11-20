@@ -5,10 +5,8 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
-import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
-import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 import org.lwjgl.vulkan.VkPhysicalDevice;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
@@ -30,6 +28,7 @@ public final class VoxyGpuDevice {
 
     private static volatile GpuDevice device;
     private static volatile GpuDeviceBackend implementation;
+    private static volatile VkPhysicalDevice physicalDevice;
     private static volatile VoxyVulkanContext vulkanContext;
     private static volatile Backend backend;
     private static volatile String backendClassName = "not initialized";
