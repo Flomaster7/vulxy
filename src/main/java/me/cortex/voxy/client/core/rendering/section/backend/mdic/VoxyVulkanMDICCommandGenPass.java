@@ -71,7 +71,7 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         defines.put("TEMPORAL_OFFSET", Integer.toString(TEMPORAL_OFFSET));
         defines.put("TRANSLUCENT_DISTANCE_BUFFER_BINDING", "7");
         if (this.statisticsEnabled) {
-            defines.put("HAS_STATISTICS", "");
+            defines.put("HAS_STATISTICS", "1");
             defines.put("STATISTICS_BUFFER_BINDING", Integer.toString(STATISTICS_BINDING));
         }
         Map<String, String> replacements = Map.of();
@@ -130,6 +130,23 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
             throw new IllegalArgumentException("Command buffer must not be null");
         }
         this.context.graphicsToComputeBarrier(commandBuffer);
+        this.recordDispatch(commandBuffer);
+    }
+
+    /**
+     * Records command generation when visibility was produced by a preceding
+     * compute shader (for example the all-visible bring-up fallback).
+     */
+    public void recordAfterComputeVisibility(VkCommandBuffer commandBuffer) {
+        this.checkOpen();
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        this.context.computeToComputeBarrier(commandBuffer);
+        this.recordDispatch(commandBuffer);
+    }
+
+    private void recordDispatch(VkCommandBuffer commandBuffer) {
         this.pipeline.dispatchIndirect(commandBuffer, this.indirectDispatchBuffer(), 0);
         this.context.computeToComputeBarrier(commandBuffer);
     }
