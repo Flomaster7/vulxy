@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering.section.backend.mdic;
 
-import com.mojang.renderpearl.backend.vulkan.VulkanCommandBuffer;
 import me.cortex.voxy.client.core.VoxyVulkanBuffer;
 import me.cortex.voxy.client.core.VoxyVulkanComputePipeline;
 import me.cortex.voxy.client.core.VoxyVulkanContext;
@@ -9,7 +8,6 @@ import org.lwjgl.vulkan.VkCommandBuffer;
 
 import java.util.Map;
 
-import static org.lwjgl.vulkan.VK10.*;
 
 /**
  * First isolated Vulkan port of the MDIC renderer's prep.comp pass.
