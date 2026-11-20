@@ -90,7 +90,7 @@ public final class VoxyVulkanMDICAllVisibleFallbackPass implements AutoCloseable
         if (commandBuffer == null) {
             throw new IllegalArgumentException("Command buffer must not be null");
         }
-        this.context.computeToComputeBarrier(commandBuffer);
+        this.context.computeToComputeAndIndirectBarrier(commandBuffer);
         this.pipeline.dispatchIndirect(commandBuffer, this.dispatchBuffer, 0);
         this.context.computeToComputeBarrier(commandBuffer);
     }
