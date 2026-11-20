@@ -22,6 +22,7 @@ import static org.lwjgl.vulkan.VK10.*;
  */
 public final class VoxyVulkanImage implements AutoCloseable {
     private final long allocator;
+    private final VkDevice device;
     private final long image;
     private final long allocation;
     private final int format;
@@ -50,6 +51,7 @@ public final class VoxyVulkanImage implements AutoCloseable {
         }
 
         this.allocator = context.vmaAllocator();
+        this.device = context.vkDevice();
         if (this.allocator == 0L) {
             throw new IllegalStateException("Minecraft's Vulkan VMA allocator is not initialized");
         }
@@ -249,17 +251,12 @@ public final class VoxyVulkanImage implements AutoCloseable {
             return;
         }
         this.closed = true;
-        VkDevice device = this.device();
         for (long view : this.views) {
             vkDestroyImageView(device, view, null);
         }
         this.views.clear();
         this.defaultView = 0L;
         vmaDestroyImage(this.allocator, this.image, this.allocation);
-    }
-
-    private VkDevice device() {
-        return VoxyGpuDevice.getVulkanDevice().vkDevice();
     }
 
     private void checkOpen() {
