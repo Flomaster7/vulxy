@@ -41,6 +41,14 @@ public final class VoxyVulkanMDICTranslucentGenPass implements AutoCloseable {
             throw new IllegalArgumentException("MDIC translucent generation context and buffers must not be null");
         }
         context.requireComputeOnFrontendQueue();
+        if (!drawBuffer.supportsUsage(org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                | org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)) {
+            throw new IllegalArgumentException("Translucent draw buffer must support storage and indirect usage");
+        }
+        if (!drawCountBuffer.supportsUsage(org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                | org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)) {
+            throw new IllegalArgumentException("MDIC draw-count buffer must support storage and indirect usage");
+        }
 
         this.context = context;
         this.dispatchBuffer = drawCountBuffer;
