@@ -338,6 +338,29 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
         vkCmdDispatch(commandBuffer, groupsX, groupsY, groupsZ);
     }
 
+    /**
+     * Dispatches using a VkDispatchIndirectCommand stored in a Vulkan buffer.
+     * The buffer must have been created with VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.
+     */
+    public void dispatchIndirect(VkCommandBuffer commandBuffer, VoxyVulkanBuffer indirectBuffer,
+                                 long offset) {
+        this.checkOpen();
+        this.context.requireComputeOnFrontendQueue();
+        if (commandBuffer == null || indirectBuffer == null) {
+            throw new IllegalArgumentException("Command buffer and indirect buffer must not be null");
+        }
+        if ((offset & 3L) != 0L || offset < 0 || offset > indirectBuffer.size()
+                || 12L > indirectBuffer.size() - offset) {
+            throw new IllegalArgumentException("Indirect dispatch command must be 4-byte aligned and fit in the buffer");
+        }
+        if (!indirectBuffer.supportsUsage(VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)) {
+            throw new IllegalArgumentException("Indirect dispatch buffer lacks VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT");
+        }
+
+        this.bind(commandBuffer);
+        vkCmdDispatchIndirect(commandBuffer, indirectBuffer.buffer(), offset);
+    }
+
     @Override
     public void close() {
         if (this.closed) {
