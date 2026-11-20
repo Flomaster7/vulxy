@@ -22,6 +22,8 @@
     "minecraft.MixinDebugScreenEntryList",
     "minecraft.MixinFogRenderer",
     "minecraft.MixinFrontendGpuDevice",
+    "minecraft.MixinFrontendRenderPass",
+    "minecraft.MixinVulkanRenderPass",
     "minecraft.MixinLevelExtractor",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinRenderSystem",
