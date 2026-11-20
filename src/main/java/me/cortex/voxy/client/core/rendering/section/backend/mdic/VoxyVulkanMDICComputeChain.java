@@ -37,6 +37,10 @@ public final class VoxyVulkanMDICComputeChain {
             throw new IllegalArgumentException("MDIC compute chain and all passes must not be null");
         }
         context.requireComputeOnFrontendQueue();
+        if (!commandGeneration.usesContext(context) || !prefixSum.usesContext(context)
+                || !translucentGeneration.usesContext(context)) {
+            throw new IllegalArgumentException("All MDIC compute passes must use the same Vulkan context");
+        }
         this.context = context;
         this.commandGeneration = commandGeneration;
         this.prefixSum = prefixSum;
