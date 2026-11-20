@@ -37,7 +37,7 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     }
 
     private final VoxyVulkanContext context;
-    private final Map<Integer, DescriptorType> bufferBindings;
+    private final Map<Integer, DescriptorType> descriptorBindings;
     private final int pushConstantSize;
 
     private long descriptorSetLayout;
@@ -62,10 +62,10 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     /**
      * Creates a pipeline with explicit storage/uniform buffer descriptor types.
      *
-     * @param bufferBindings map of descriptor binding number to descriptor type
+     * @param descriptorBindings map of descriptor binding number to descriptor type
      */
     public VoxyVulkanComputePipeline(VoxyVulkanContext context, ByteBuffer spirv,
-                                     int pushConstantSize, Map<Integer, DescriptorType> bufferBindings) {
+                                     int pushConstantSize, Map<Integer, DescriptorType> descriptorBindings) {
         if (context == null || spirv == null) {
             throw new IllegalArgumentException("Vulkan context and SPIR-V must not be null");
         }
@@ -75,12 +75,12 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
         if (pushConstantSize < 0 || (pushConstantSize & 3) != 0) {
             throw new IllegalArgumentException("Push-constant size must be zero or a positive multiple of four");
         }
-        if (bufferBindings == null) {
+        if (descriptorBindings == null) {
             throw new IllegalArgumentException("Buffer descriptor bindings must not be null");
         }
 
         TreeMap<Integer, DescriptorType> copy = new TreeMap<>();
-        for (Map.Entry<Integer, DescriptorType> entry : bufferBindings.entrySet()) {
+        for (Map.Entry<Integer, DescriptorType> entry : descriptorBindings.entrySet()) {
             Integer binding = entry.getKey();
             DescriptorType type = entry.getValue();
             if (binding == null || binding < 0 || type == null) {
@@ -91,7 +91,7 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
 
         this.context = context;
         this.pushConstantSize = pushConstantSize;
-        this.bufferBindings = Collections.unmodifiableMap(copy);
+        this.descriptorBindings = Collections.unmodifiableMap(copy);
 
         try {
             this.create(spirv.slice());
@@ -113,8 +113,8 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
      * Creates a pipeline from SPIR-V with explicit storage/uniform descriptors.
      */
     public VoxyVulkanComputePipeline(VoxyVulkanContext context, VoxyVulkanSpirv spirv,
-                                     int pushConstantSize, Map<Integer, DescriptorType> bufferBindings) {
-        this(context, requireBytecode(spirv), pushConstantSize, bufferBindings);
+                                     int pushConstantSize, Map<Integer, DescriptorType> descriptorBindings) {
+        this(context, requireBytecode(spirv), pushConstantSize, descriptorBindings);
     }
 
     private static ByteBuffer requireBytecode(VoxyVulkanSpirv spirv) {
@@ -148,11 +148,11 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
             long shaderModule = shaderOut.get(0);
 
             try {
-                if (!this.bufferBindings.isEmpty()) {
+                if (!this.descriptorBindings.isEmpty()) {
                     VkDescriptorSetLayoutBinding.Buffer bindings =
-                            VkDescriptorSetLayoutBinding.calloc(this.bufferBindings.size(), stack);
+                            VkDescriptorSetLayoutBinding.calloc(this.descriptorBindings.size(), stack);
                     int index = 0;
-                    for (Map.Entry<Integer, DescriptorType> entry : this.bufferBindings.entrySet()) {
+                    for (Map.Entry<Integer, DescriptorType> entry : this.descriptorBindings.entrySet()) {
                         bindings.get(index++)
                                 .binding(entry.getKey())
                                 .descriptorType(entry.getValue().vkType)
@@ -206,9 +206,9 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                 vkDestroyShaderModule(device, shaderModule, null);
             }
 
-            if (!this.bufferBindings.isEmpty()) {
+            if (!this.descriptorBindings.isEmpty()) {
                 Map<Integer, Integer> descriptorCounts = new TreeMap<>();
-                for (DescriptorType type : this.bufferBindings.values()) {
+                for (DescriptorType type : this.descriptorBindings.values()) {
                     descriptorCounts.merge(type.vkType, 1, Integer::sum);
                 }
 
@@ -244,7 +244,7 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
      */
     public void bindBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
         this.checkOpen();
-        DescriptorType type = this.bufferBindings.get(binding);
+        DescriptorType type = this.descriptorBindings.get(binding);
         if (type == null) {
             throw new IllegalArgumentException("Pipeline has no buffer descriptor at binding " + binding);
         }
@@ -351,7 +351,7 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
                     .dstSet(this.descriptorSet)
                     .dstBinding(binding)
                     .descriptorCount(1)
-                    .descriptorType(this.bufferBindings.get(binding).vkType)
+                    .descriptorType(this.descriptorBindings.get(binding).vkType)
                     .pImageInfo(imageInfo);
             vkUpdateDescriptorSets(this.context.vkDevice(), write, null);
         }
@@ -446,7 +446,7 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
 
     private void requireDescriptorType(int binding, DescriptorType required) {
         this.checkOpen();
-        if (this.bufferBindings.get(binding) != required) {
+        if (this.descriptorBindings.get(binding) != required) {
             throw new IllegalArgumentException("Binding " + binding + " is not a " + required + " descriptor");
         }
     }
