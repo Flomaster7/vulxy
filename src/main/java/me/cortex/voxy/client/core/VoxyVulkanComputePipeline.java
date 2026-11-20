@@ -166,6 +166,21 @@ public final class VoxyVulkanComputePipeline implements AutoCloseable {
     }
 
     /**
+     * Compiles a compute pipeline directly from Voxy's owned SPIR-V result.
+     */
+    public VoxyVulkanComputePipeline(VoxyVulkanContext context, VoxyVulkanSpirv spirv,
+                                     int pushConstantSize, int... storageBufferBindings) {
+        this(context, requireBytecode(spirv), pushConstantSize, storageBufferBindings);
+    }
+
+    private static ByteBuffer requireBytecode(VoxyVulkanSpirv spirv) {
+        if (spirv == null) {
+            throw new IllegalArgumentException("SPIR-V result must not be null");
+        }
+        return spirv.bytecode();
+    }
+
+    /**
      * Writes or replaces one storage-buffer descriptor in set zero.
      */
     public void bindStorageBuffer(int binding, VoxyVulkanBuffer buffer, long offset, long range) {
