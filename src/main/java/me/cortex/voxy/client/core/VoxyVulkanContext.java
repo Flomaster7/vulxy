@@ -116,6 +116,9 @@ public final class VoxyVulkanContext {
 
     public VkCommandBuffer allocateAndBeginComputeCommandBuffer() {
         this.requireComputeOnFrontendQueue();
+        if (this.frontendEncoder.isInRenderPass()) {
+            throw new IllegalStateException("Cannot begin Voxy compute work while a RenderPearl render pass is active");
+        }
         return this.allocateAndBeginTransientCommandBuffer();
     }
 
@@ -148,6 +151,56 @@ public final class VoxyVulkanContext {
      */
     public VkCommandBuffer allocateAndBeginTransientCommandBuffer() {
         return this.commandEncoder.allocateAndBeginTransientCommandBuffer();
+    }
+
+    /**
+     * Adds a shader-write barrier between two compute dispatches recorded on
+     * the same command buffer.
+     */
+    public void computeToComputeBarrier(VkCommandBuffer commandBuffer) {
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack)
+                    .sType$Default()
+                    .srcAccessMask(VK_ACCESS_SHADER_WRITE_BIT)
+                    .dstAccessMask(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+            vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    0,
+                    barrier,
+                    null,
+                    null
+            );
+        }
+    }
+
+    /**
+     * Makes shader-storage writes from the graphics/fragment stages visible
+     * to a following compute dispatch, for example after Voxy's raster culler.
+     */
+    public void graphicsToComputeBarrier(VkCommandBuffer commandBuffer) {
+        if (commandBuffer == null) {
+            throw new IllegalArgumentException("Command buffer must not be null");
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            VkMemoryBarrier.Buffer barrier = VkMemoryBarrier.calloc(1, stack)
+                    .sType$Default()
+                    .srcAccessMask(VK_ACCESS_SHADER_WRITE_BIT)
+                    .dstAccessMask(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+            vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    0,
+                    barrier,
+                    null,
+                    null
+            );
+        }
     }
 
     /**
