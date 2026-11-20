@@ -7,6 +7,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
+import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
 
@@ -52,19 +53,22 @@ public final class VoxyGpuDevice {
         VulkanDevice vulkanDevice = backendImplementation instanceof VulkanDevice selectedVulkanDevice
                 ? selectedVulkanDevice
                 : null;
+        FrontendCommandEncoder frontendCommandEncoder = null;
         VulkanCommandEncoder vulkanCommandEncoder = null;
         if (createdDevice instanceof FrontendGpuDevice) {
-            var frontendEncoder = createdDevice.createCommandEncoder();
-            if (frontendEncoder instanceof FrontendCommandEncoder wrappedEncoder
-                    && wrappedEncoder.backend() instanceof VulkanCommandEncoder selectedEncoder) {
-                vulkanCommandEncoder = selectedEncoder;
+            var encoder = createdDevice.createCommandEncoder();
+            if (encoder instanceof FrontendCommandEncoder wrappedEncoder) {
+                frontendCommandEncoder = wrappedEncoder;
+                if (wrappedEncoder.backend() instanceof VulkanCommandEncoder selectedEncoder) {
+                    vulkanCommandEncoder = selectedEncoder;
+                }
             }
         }
 
         backend = vulkanSelected ? Backend.VULKAN : Backend.OTHER;
-        vulkanContext = vulkanDevice == null || vulkanCommandEncoder == null
+        vulkanContext = vulkanDevice == null || frontendCommandEncoder == null || vulkanCommandEncoder == null
                 ? null
-                : new VoxyVulkanContext(vulkanDevice, vulkanCommandEncoder);
+                : new VoxyVulkanContext(vulkanDevice, frontendCommandEncoder, vulkanCommandEncoder);
         backendClassName = backendImplementation == null
                 ? selectedBackend.getClass().getName()
                 : backendImplementation.getClass().getName();
