@@ -10,6 +10,8 @@ import org.lwjgl.vulkan.VkCommandBuffer;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkMemoryBarrier;
 
+import static org.lwjgl.vulkan.VK10.*;
+
 /**
  * Narrow bridge from Voxy to Minecraft 26.3's Vulkan implementation.
  *
