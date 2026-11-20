@@ -4,7 +4,7 @@ import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanInstance;
 import com.mojang.renderpearl.backend.vulkan.init.FeatureSet;
-import com.mojang.renderpearl.backend.vulkan.debug.CheckpointExtension;
+import com.mojang.renderpearl.backend.vulkan.checkpoints.CheckpointExtension;
 import me.cortex.voxy.client.core.VoxyGpuDevice;
 import org.lwjgl.vulkan.VkDevice;
 import org.spongepowered.asm.mixin.Mixin;
