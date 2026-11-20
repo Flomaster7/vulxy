@@ -157,3 +157,20 @@ The pass ordering is intended to be:
 6. Compute-to-graphics barrier, then opaque/translucent/temporal drawing
 
 These classes remain isolated and are not called by the existing OpenGL MDIC renderer. They still need a build, SPIR-V validation, and device testing. The raster visibility/culling stage and all Vulkan draw passes remain outstanding.
+
+### Image resources and Hi-Z groundwork
+
+- `VoxyVulkanImage` creates VMA-backed 2D images, tracks per-mip image views, exposes usage/format metadata, and records explicit image-layout barriers.
+- `VoxyVulkanSampler` provides Vulkan nearest/linear sampling and address-mode configuration.
+- The compute pipeline now accepts sampled-image and storage-image descriptors in addition to buffer descriptors.
+- The physical `VkPhysicalDevice` is captured from the actual `VulkanDevice` constructor argument through `MixinVulkanDevice`. Queue-family, subgroup, and optimal-tiling format checks use that selected physical device rather than attempting to derive it from an LWJGL `VkDevice`.
+- `VoxyVulkanHiZPass` compiles the existing `voxy:hiz/hiz.comp` shader, adapts its OpenGL loose uniform to an 8-byte Vulkan push-constant block, binds mip 0 as a sampled image and mips 1..6 as storage images, and dispatches the 64x64 reduction groups.
+- The Hi-Z pass checks that R32_SFLOAT supports sampled and storage usage and that the physical device supports compute basic/arithmetic/clustered subgroup operations before creating its pipeline.
+
+Hi-Z still assumes mip 0 has already been populated and transitioned to `SHADER_READ_ONLY_OPTIMAL`, while output mips 1..6 are in `GENERAL`. The initial depth-to-mip-0 raster stage and subsequent Vulkan terrain/culling passes are not ported yet.
+
+### Ordered MDIC compute command recording
+
+The four compute passes now provide `record(VkCommandBuffer)` methods. `VoxyVulkanMDICComputeChain` records command generation, prefix sum and translucent command generation into one transient command buffer, with explicit compute/graphics memory barriers between stages. The one-shot `dispatch()` methods remain available for isolated use.
+
+This keeps the compute-to-compute dependencies in one command buffer, instead of relying on implicit visibility between separately submitted command buffers. The chain is not yet called by the live renderer because the visibility culler and final draw passes still need Vulkan implementations.
