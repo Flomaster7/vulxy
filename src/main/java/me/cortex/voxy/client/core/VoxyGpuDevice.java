@@ -2,16 +2,20 @@ package me.cortex.voxy.client.core;
 
 import com.mojang.renderpearl.api.device.GpuBackend;
 import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
+import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
+import com.mojang.renderpearl.frontend.FrontendGpuDevice;
+import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
 
 /**
- * Holds the RenderPearl device selected by Minecraft.
+ * Holds the RenderPearl device selected by Minecraft and, where available,
+ * its backend implementation.
  *
- * Voxy's renderer still uses OpenGL directly. Keeping the selected RenderPearl
- * device behind this small boundary lets the renderer migrate incrementally
- * without assuming that an OpenGL context exists.
- *
- * This class does not make the current renderer Vulkan-compatible by itself.
+ * The public RenderPearl GpuDevice API does not expose compute dispatch. The
+ * Vulkan renderer therefore needs a narrow bridge to Minecraft's Vulkan
+ * backend while continuing to use RenderPearl for the surrounding device
+ * lifecycle and ordinary rendering resources.
  */
 public final class VoxyGpuDevice {
     public enum Backend {
@@ -20,6 +24,7 @@ public final class VoxyGpuDevice {
     }
 
     private static volatile GpuDevice device;
+    private static volatile GpuDeviceBackend implementation;
     private static volatile Backend backend;
     private static volatile String backendClassName = "not initialized";
 
@@ -35,14 +40,21 @@ public final class VoxyGpuDevice {
             throw new IllegalArgumentException("The selected GPU backend and device must not be null");
         }
 
-        if (selectedBackend instanceof VulkanBackend) {
-            backend = Backend.VULKAN;
-        } else {
-            // Do not infer a concrete API from implementation class names.
-            backend = Backend.OTHER;
+        GpuDeviceBackend backendImplementation = null;
+        if (createdDevice instanceof FrontendGpuDevice frontendDevice) {
+            backendImplementation = ((MixinFrontendGpuDevice) frontendDevice).voxy$getBackend();
         }
 
-        backendClassName = selectedBackend.getClass().getName();
+        if (selectedBackend instanceof VulkanBackend && !(backendImplementation instanceof VulkanDevice)) {
+            throw new IllegalStateException("Minecraft selected Vulkan, but its RenderPearl backend is not a VulkanDevice: "
+                    + (backendImplementation == null ? "null" : backendImplementation.getClass().getName()));
+        }
+
+        backend = selectedBackend instanceof VulkanBackend ? Backend.VULKAN : Backend.OTHER;
+        backendClassName = backendImplementation == null
+                ? selectedBackend.getClass().getName()
+                : backendImplementation.getClass().getName();
+        implementation = backendImplementation;
         device = createdDevice;
     }
 
@@ -58,8 +70,24 @@ public final class VoxyGpuDevice {
         return current;
     }
 
+    /**
+     * Returns Minecraft's Vulkan backend. This is intentionally separate from
+     * the public RenderPearl API and must only be used by the Vulkan renderer.
+     */
+    public static VulkanDevice getVulkanDevice() {
+        GpuDeviceBackend current = implementation;
+        if (backend != Backend.VULKAN || !(current instanceof VulkanDevice vulkanDevice)) {
+            throw new IllegalStateException("The active RenderPearl backend is not Vulkan");
+        }
+        return vulkanDevice;
+    }
+
     public static boolean isInitialized() {
         return device != null;
+    }
+
+    public static boolean isVulkan() {
+        return backend == Backend.VULKAN;
     }
 
     public static Backend getBackend() {
