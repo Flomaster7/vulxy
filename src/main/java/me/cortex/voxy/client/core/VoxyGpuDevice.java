@@ -7,8 +7,10 @@ import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
+import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
 import com.mojang.renderpearl.frontend.FrontendCommandEncoder;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
+import org.lwjgl.vulkan.VkPhysicalDevice;
 import me.cortex.voxy.client.mixin.minecraft.MixinFrontendGpuDevice;
 
 /**
@@ -74,6 +76,25 @@ public final class VoxyGpuDevice {
                 : backendImplementation.getClass().getName();
         implementation = backendImplementation;
         device = createdDevice;
+    }
+
+    /**
+     * Captures the selected physical device from the VulkanDevice constructor
+     * mixin. VulkanDevice does not expose that handle through its public API.
+     */
+    public static void capturePhysicalDevice(VulkanPhysicalDevice selectedPhysicalDevice) {
+        if (selectedPhysicalDevice == null || selectedPhysicalDevice.vkPhysicalDevice() == null) {
+            throw new IllegalArgumentException("Selected Vulkan physical device must not be null");
+        }
+        physicalDevice = selectedPhysicalDevice.vkPhysicalDevice();
+    }
+
+    public static VkPhysicalDevice getPhysicalDevice() {
+        VkPhysicalDevice current = physicalDevice;
+        if (current == null) {
+            throw new IllegalStateException("Minecraft's Vulkan physical device has not been captured yet");
+        }
+        return current;
     }
 
     /**
