@@ -52,6 +52,12 @@ public final class VoxyVulkanHiZPass implements AutoCloseable {
         if (!image.supportsUsage(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) {
             throw new IllegalArgumentException("Hi-Z image must support both sampled and storage image usage");
         }
+        if (!context.supportsOptimalImageFormat(
+                VK_FORMAT_R32_SFLOAT,
+                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
+        )) {
+            throw new IllegalStateException("The Vulkan device does not support R32_SFLOAT sampled and storage images");
+        }
         if (!context.supportsClusteredComputeSubgroups()) {
             throw new IllegalStateException("The Vulkan device does not support compute clustered subgroup operations required by hiz.comp");
         }
