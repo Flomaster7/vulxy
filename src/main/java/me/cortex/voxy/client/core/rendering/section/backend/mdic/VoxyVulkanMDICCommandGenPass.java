@@ -148,6 +148,10 @@ public final class VoxyVulkanMDICCommandGenPass implements AutoCloseable {
         return this.dispatchBuffer;
     }
 
+    boolean usesContext(VoxyVulkanContext context) {
+        return this.context == context;
+    }
+
     @Override
     public void close() {
         if (this.closed) {
