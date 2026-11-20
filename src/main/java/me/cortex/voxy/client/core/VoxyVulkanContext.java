@@ -59,6 +59,45 @@ public final class VoxyVulkanContext {
         return this.device.computeQueue() != null;
     }
 
+    public int graphicsQueueFamilyIndex() {
+        return this.device.graphicsQueue().queueFamilyIndex();
+    }
+
+    public int computeQueueFamilyIndex() {
+        VulkanQueue queue = this.device.computeQueue();
+        return queue == null ? -1 : queue.queueFamilyIndex();
+    }
+
+    /**
+     * The frontend encoder records its transient buffers for Minecraft's
+     * graphics queue. Vulkan permits compute dispatch on that command buffer
+     * only when the graphics queue family also advertises compute support.
+     * RenderPearl's public API does not expose the queue-family flags here, so
+     * a shared family with the device's selected compute queue is the safe
+     * condition to require.
+     */
+    public boolean canDispatchComputeOnFrontendQueue() {
+        return this.hasComputeQueue()
+                && this.graphicsQueueFamilyIndex() == this.computeQueueFamilyIndex();
+    }
+
+    public void requireComputeOnFrontendQueue() {
+        if (!this.canDispatchComputeOnFrontendQueue()) {
+            throw new IllegalStateException(
+                    "Voxy compute cannot use Minecraft's frontend command encoder: graphics queue family "
+                            + this.graphicsQueueFamilyIndex()
+                            + " differs from compute queue family "
+                            + this.computeQueueFamilyIndex()
+                            + ". A dedicated compute submission path is required for this GPU."
+            );
+        }
+    }
+
+    public VkCommandBuffer allocateAndBeginComputeCommandBuffer() {
+        this.requireComputeOnFrontendQueue();
+        return this.allocateAndBeginTransientCommandBuffer();
+    }
+
     /**
      * Minecraft owns this allocator. Voxy may allocate and release its own
      * VMA allocations from it, but must never destroy the allocator itself.
