@@ -25,6 +25,7 @@ public final class VoxyGpuDevice {
 
     private static volatile GpuDevice device;
     private static volatile GpuDeviceBackend implementation;
+    private static volatile VoxyVulkanContext vulkanContext;
     private static volatile Backend backend;
     private static volatile String backendClassName = "not initialized";
 
@@ -45,12 +46,13 @@ public final class VoxyGpuDevice {
             backendImplementation = ((MixinFrontendGpuDevice) frontendDevice).voxy$getBackend();
         }
 
-        if (selectedBackend instanceof VulkanBackend && !(backendImplementation instanceof VulkanDevice)) {
-            throw new IllegalStateException("Minecraft selected Vulkan, but its RenderPearl backend is not a VulkanDevice: "
-                    + (backendImplementation == null ? "null" : backendImplementation.getClass().getName()));
-        }
+        boolean vulkanSelected = selectedBackend instanceof VulkanBackend;
+        VulkanDevice vulkanDevice = backendImplementation instanceof VulkanDevice selectedVulkanDevice
+                ? selectedVulkanDevice
+                : null;
 
-        backend = selectedBackend instanceof VulkanBackend ? Backend.VULKAN : Backend.OTHER;
+        backend = vulkanSelected ? Backend.VULKAN : Backend.OTHER;
+        vulkanContext = vulkanDevice == null ? null : new VoxyVulkanContext(vulkanDevice);
         backendClassName = backendImplementation == null
                 ? selectedBackend.getClass().getName()
                 : backendImplementation.getClass().getName();
@@ -80,6 +82,14 @@ public final class VoxyGpuDevice {
             throw new IllegalStateException("The active RenderPearl backend is not Vulkan");
         }
         return vulkanDevice;
+    }
+
+    public static VoxyVulkanContext getVulkanContext() {
+        VoxyVulkanContext current = vulkanContext;
+        if (backend != Backend.VULKAN || current == null) {
+            throw new IllegalStateException("Minecraft's Vulkan backend is not available through the RenderPearl frontend");
+        }
+        return current;
     }
 
     public static boolean isInitialized() {
