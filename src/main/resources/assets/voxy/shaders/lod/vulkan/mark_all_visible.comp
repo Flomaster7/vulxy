@@ -1,0 +1,26 @@
+#version 460 core
+
+layout(local_size_x = 128) in;
+
+#define VISIBILITY_BUFFER_BINDING 1
+#define VISIBILITY_ACCESS
+#define INDIRECT_SECTION_LOOKUP_BINDING 2
+
+#import <voxy:lod/gl46/bindings.glsl>
+
+// Conservative fallback for Vulkan bring-up: mark every section in the
+// current render list as visible. This skips occlusion/frustum culling but
+// keeps the original temporal visibility bit semantics.
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= sectionCount) {
+        return;
+    }
+
+    uint sectionId = indirectLookup[index];
+    uint previous = visibilityData[sectionId] & 0x7fffffffu;
+    bool wasVisibleLastFrame = previous == (frameId - 1u);
+
+    visibilityData[sectionId] = (frameId & 0x7fffffffu)
+            | (uint(wasVisibleLastFrame) << 31);
+}

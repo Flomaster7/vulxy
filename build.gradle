@@ -377,6 +377,10 @@ repositories {
 
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    // Minecraft 26.3 provides these LWJGL modules at runtime; Voxy only needs their Java bindings to compile.
+    compileOnly "org.lwjgl:lwjgl-shaderc"
+    compileOnly "org.lwjgl:lwjgl-vma"
+
     if (findProject("lwjgl_use_unsafe")?:false) {
         implementation "org.lwjgl:lwjgl:unsafe"
         include(implementation "org.lwjgl:lwjgl-lmdb:unsafe")
